@@ -6,7 +6,7 @@
   "scripts": {
     "test": "mocha './test/**/*.test.js'",
     "coverage": "istanbul cover _mocha './test/**/*.test.js'",
-    "start": "node server.js"
+    "start": "node src/server.js"
   },
   "keywords": [],
   "author": "",
@@ -14,9 +14,13 @@
   "devDependencies": {
     "chai": "^4.1.2",
     "istanbul": "^0.4.5",
-    "mocha": "^5.2.0"
+    "mocha": "^5.2.0",
+    "mountebank": "^1.14.1"
   },
   "dependencies": {
-    "express": "^4.16.3"
+    "express": "^4.16.3",
+    "folktale": "^2.1.0",
+    "lodash": "^4.17.10",
+    "nodemailer": "^4.6.5"
   }
 }

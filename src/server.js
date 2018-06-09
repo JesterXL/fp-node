@@ -1,5 +1,7 @@
 const express = require('express')
 const virusScan = require('./@jxl/virus-scan-middleware')
+const Maybe = require('folktale/maybe')
+const { Just, Nothing } = Maybe
 
 function sendEmail(req, res, next) {
   const files = req.files
@@ -59,10 +61,21 @@ function sendEmail(req, res, next) {
 const app = express()
 app.post('/upload', virusScan, sendEmail)
 
-app.listen(3000, () => console.log('Example app listening on port 3000!'))
+if(require.main === module) {
+
+}
+
 
 const howFly = () => 'sooooo fly'
+const mainIsModule = (module, main) => main === module
+const startServerIfCommandline = (main, module, app, port) =>
+  mainIsModule(main, module)
+  ? Just(app.listen(3000, () => console.log('Example app listening on port 3000!')))
+  : Nothing()
 
 module.exports = {
-  howFly
+  howFly,
+  startServerIfCommandline
 }
+
+startServerIfCommandline(require.main, module, app, 3000)
