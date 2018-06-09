@@ -1,0 +1,22 @@
+{
+  "name": "fp-node",
+  "version": "1.0.0",
+  "description": "Writing Functional Programming in Node is one challenge, but unit testing it is another. Mainly because many middlewares in Node use the connect middleware approach, and libraries in Node are not written in a pure function way.",
+  "main": "sandbox.js",
+  "scripts": {
+    "test": "mocha './test/**/*.test.js'",
+    "coverage": "istanbul cover _mocha './test/**/*.test.js'",
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "chai": "^4.1.2",
+    "istanbul": "^0.4.5",
+    "mocha": "^5.2.0"
+  },
+  "dependencies": {
+    "express": "^4.16.3"
+  }
+}
