@@ -39,3 +39,11 @@ const getSecretKeySafe = config => {
         return Result.Error(error)
     }
 }
+
+
+const add = (a, b) => a + b
+
+
+const cow = { name: 'Dat Cow' }
+console.log(cow.chicken) // undefined, but ok to do
+console.log(undefined.chicken) // throws an Error

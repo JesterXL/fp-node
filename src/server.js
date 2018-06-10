@@ -1,7 +1,67 @@
 const express = require('express')
 const virusScan = require('./@jxl/virus-scan-middleware')
+const userModule = require('./userModule')
+const formidable = require('express-formidable')
 const Maybe = require('folktale/maybe')
 const { Just, Nothing } = Maybe
+const {
+  get,
+  getOr,
+  filter,
+  map,
+  curry
+} = require('lodash/fp')
+
+const legitFiles = files => Array.isArray(files) && files.length > 0
+const validFilesOnRequest = req => legitFiles(get('files', req))
+
+const readEmailTemplate = fs =>
+  new Promise((success, failure) =>
+    fs.readFile('./templates/email.html', 'utf-8', (err, template) =>
+      err
+      ? failure(err)
+      : success(template)))
+
+const getCannotReadEmailTemplateError = () => new Error('Cannot read email template')
+
+const filterCleanFiles = filter(
+  file => get('scan', file) === 'clean'
+)
+const mapFilesToAttachments = map(
+  file => ({
+    filename: getOr('unknown originalname', 'originalname', file),
+    path: getOr('unknown path', 'path', file)
+  })
+)
+
+const render = curry((renderFunction, template, value) =>
+  new Promise( success => success(renderFunction(template, value))))
+
+const getEmailService = config =>
+  config.has('emailService')
+  ? Just(config.get('emailService'))
+  : Nothing()
+
+const createTransport = (host, port) => ({
+  host,
+  port,
+  secure: false,
+})
+
+const createMailOptions = (from, to, subject, html, attachments) =>
+({
+  from,
+  to,
+  subject,
+  html,
+  attachments
+})
+
+const getEmailServiceUnavailableError = () => new Error('Email service unavailable')
+
+const createTransportMailer = curry((createTransportFunction, transportObject) =>
+  createTransportFunction(transportObject))
+
 
 function sendEmail(req, res, next) {
   const files = req.files
@@ -59,12 +119,8 @@ function sendEmail(req, res, next) {
 }
 
 const app = express()
+app.use(formidable())
 app.post('/upload', virusScan, sendEmail)
-
-if(require.main === module) {
-
-}
-
 
 const howFly = () => 'sooooo fly'
 const mainIsModule = (module, main) => main === module
@@ -75,7 +131,19 @@ const startServerIfCommandline = (main, module, app, port) =>
 
 module.exports = {
   howFly,
-  startServerIfCommandline
+  startServerIfCommandline,
+  legitFiles,
+  validFilesOnRequest,
+  readEmailTemplate,
+  getCannotReadEmailTemplateError,
+  filterCleanFiles,
+  mapFilesToAttachments,
+  render,
+  getEmailService,
+  createTransport,
+  createMailOptions,
+  getEmailServiceUnavailableError,
+  createTransportMailer
 }
 
 startServerIfCommandline(require.main, module, app, 3000)

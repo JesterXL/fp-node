@@ -1,0 +1,12 @@
+<html>
+<head><title>Zee Documents</title></head>
+<body>
+    <h1>Hello {{userName}}!</h1>
+    <p>Attached to this email are your documents.</p>
+    <p>Documents:
+        {{#files}}
+        <b>{{name}}</b>
+        {{/files}}
+    </p>
+</body>
+</html>
