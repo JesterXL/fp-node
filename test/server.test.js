@@ -20,7 +20,9 @@ const {
     getEmailService,
     createTransport,
     createMailOptions,
-    getEmailServiceUnavailableError
+    getEmailServiceUnavailableError,
+    createTransportMailer,
+    sendEmailSafe
 } = require('../src/server')
 
 describe('src/server.js', ()=> {
@@ -175,6 +177,21 @@ describe('src/server.js', ()=> {
         it('should create an error with a message', ()=> {
             const error = getEmailServiceUnavailableError()
             expect(error.message).to.equal('Email service unavailable')
+        })
+    })
+    describe('createTransportMailer when called', ()=> {
+        it('should work with good stubs', ()=> {
+            expect(createTransportMailer(stubTrue, {})).to.equal(true)
+        })
+    })
+    describe('sendEmailSafe when called', ()=> {
+        const sendEmailStub = (options, callback) => callback(undefined, 'info')
+        const sendEmailBadStub = (options, callback) => callback(new Error('dat boom'))
+        it('should work with good stubs', ()=> {
+            return expect(sendEmailSafe(sendEmailStub, {})).to.be.fulfilled
+        })
+        it('should fail with bad stubs', ()=> {
+            return expect(sendEmailSafe(sendEmailBadStub, {})).to.be.rejected
         })
     })
 })

@@ -62,6 +62,15 @@ const getEmailServiceUnavailableError = () => new Error('Email service unavailab
 const createTransportMailer = curry((createTransportFunction, transportObject) =>
   createTransportFunction(transportObject))
 
+const sendEmailSafe = curry((sendEmailFunction, mailOptions) =>
+  new Promise((success, failure) =>
+    sendEmailFunction(mailOptions, (err, info) =>
+      err
+      ? failure(err)
+      : success(info)
+    )
+  )
+)
 
 function sendEmail(req, res, next) {
   const files = req.files
@@ -143,7 +152,8 @@ module.exports = {
   createTransport,
   createMailOptions,
   getEmailServiceUnavailableError,
-  createTransportMailer
+  createTransportMailer,
+  sendEmailSafe
 }
 
 startServerIfCommandline(require.main, module, app, 3000)
