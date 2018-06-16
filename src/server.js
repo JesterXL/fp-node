@@ -1,6 +1,6 @@
 const express = require('express')
 const virusScan = require('./@jxl/virus-scan-middleware')
-const userModule = require('./userModule')
+const user = require('./userModule')
 const formidable = require('express-formidable')
 const Maybe = require('folktale/maybe')
 const { Just, Nothing } = Maybe
@@ -9,17 +9,23 @@ const {
   getOr,
   filter,
   map,
-  curry
+  curry,
+  flow
 } = require('lodash/fp')
+const fs = require('fs')
+const config = require('config')
+const nodemailer = require('nodemailer')
+
+const app = express()
 
 const legitFiles = files => Array.isArray(files) && files.length > 0
 const validFilesOnRequest = req => legitFiles(get('files', req))
 
-const readEmailTemplate = fs =>
+const readEmailTemplate = readFile =>
   new Promise((success, failure) =>
-    fs.readFile('./templates/email.html', 'utf-8', (err, template) =>
+    readFile('./templates/email.html', 'utf-8', (err, template) =>
       err
-      ? failure(err)
+      ? failure(getCannotReadEmailTemplateError())
       : success(template)))
 
 const getCannotReadEmailTemplateError = () => new Error('Cannot read email template')
@@ -34,7 +40,7 @@ const mapFilesToAttachments = map(
   })
 )
 
-const render = curry((renderFunction, template, value) =>
+const renderSafe = curry((renderFunction, template, value) =>
   new Promise( success => success(renderFunction(template, value))))
 
 const getEmailService = config =>
@@ -42,7 +48,7 @@ const getEmailService = config =>
   ? Just(config.get('emailService'))
   : Nothing()
 
-const createTransport = (host, port) => ({
+const createTransportObject = (host, port) => ({
   host,
   port,
   secure: false,
@@ -72,62 +78,55 @@ const sendEmailSafe = curry((sendEmailFunction, mailOptions) =>
   )
 )
 
-function sendEmail(req, res, next) {
-  const files = req.files
-  if (!Array.isArray(files) || !files.length) {
-    return next()
-  }
+const sendEmailOrNext = curry((readFile, config, createTransport, getUserEmail, req, res, next) =>
+  validFilesOnRequest(req)
+    ? sendEmail(readFile, config, createTransport, getUserEmail, req, res, next)
+    : next() && Promise.resolve(false))
 
-  userModule.getUserEmail(req.cookie.sessionID).then(value => {
-    fs.readFile('./templates/email.html', 'utf-8', (err, template) => {
-      if (err) {
-        console.log(err)
-        err.message = 'Cannot read email template'
-        err.httpStatusCode = 500
-        return next(err)
-      }
-      let attachments = []
-      files.map(file => {
-        if (file.scan === 'clean') {
-          attachments.push({ filename: file.originalname, path: file.path })
-        }
-      })
+const filterCleanFilesAndMapToAttachments = flow([
+  get('files'),
+  filterCleanFiles,
+  mapFilesToAttachments
+])
 
-      value.attachments = attachments
-      req.attachments = attachments
-      let emailBody = Mustache.render(template, value)
+const getSessionIDFromRequest = get('cookie.sessionID')
+const getEmailTemplateAndAttachments = curry((getUserEmail, readFile, req) =>
+  Promise.all([
+    getUserEmail(getSessionIDFromRequest(req)),
+    readEmailTemplate(readFile),
+    filterCleanFilesAndMapToAttachments(req)
+  ]))
 
-      let emailService = config.get('emailService')
-      const transporter = nodemailer.createTransport({
-        host: emailService.host,
-        port: emailService.port,
-        secure: false,
-      })
+const renderEmailAndGetEmailService = curry((config, render, template, userEmailAddress) =>
+  Promise.all([
+    renderSafe(render, template, userEmailAddress),
+    getEmailService(config)
+  ])
+)
 
-      const mailOptions = {
-        from: emailService.from,
-        to: emailService.to,
-        subject: emailService.subject,
-        html: emailBody,
-        attachments: attachments,
-      }
+const sendEmail = curry((readFile, config, createTransport, getUserEmail, render, req, res, next) =>
+    getEmailTemplateAndAttachments(getUserEmail, readFile, req)
+    .then( ([userEmailAddress, emailTemplate, fileAttachments]) => 
+      renderEmailAndGetEmailService(config, render, emailTemplate, userEmailAddress)
+      .then( ([emailBody, emailService]) =>
+        sendEmailSafe(
+          createTransport(
+            createTransportObject(emailService.host, emailBody.port)
+          ).sendEmail,
+          createMailOptions(
+            emailService.from,
+            emailService.to,
+            emailService.subject,
+            emailBody,
+            fileAttachments
+          )
+        )
+      )
+    ))
 
-      transporter.sendMail(mailOptions, (err, info) => {
-        if (err) {
-          err.message = 'Email service unavailable'
-          err.httpStatusCode = 500
-          return next(err)
-        } else {
-          return next()
-        }
-      })
-    })
-  }, reason => {
-    return next(reason)
-  })
-}
 
-const app = express()
+app.post('/upload', sendEmail(fs.readFile, config, nodemailer.createTransport, user.getUserEmail))
+
 app.use(formidable())
 app.post('/upload', virusScan, sendEmail)
 
@@ -147,13 +146,17 @@ module.exports = {
   getCannotReadEmailTemplateError,
   filterCleanFiles,
   mapFilesToAttachments,
-  render,
+  renderSafe,
   getEmailService,
-  createTransport,
+  createTransportObject,
   createMailOptions,
   getEmailServiceUnavailableError,
   createTransportMailer,
-  sendEmailSafe
+  sendEmailSafe,
+  filterCleanFilesAndMapToAttachments,
+  getEmailTemplateAndAttachments,
+  renderEmailAndGetEmailService,
+  sendEmail
 }
 
 startServerIfCommandline(require.main, module, app, 3000)
