@@ -51,7 +51,7 @@ const getEmailService = config =>
 const createTransportObject = (host, port) => ({
   host,
   port,
-  secure: false,
+  secure: false
 })
 
 const createMailOptions = (from, to, subject, html, attachments) =>
@@ -68,9 +68,9 @@ const getEmailServiceUnavailableError = () => new Error('Email service unavailab
 const createTransportMailer = curry((createTransportFunction, transportObject) =>
   createTransportFunction(transportObject))
 
-const sendEmailSafe = curry((sendEmailFunction, mailOptions) =>
+const sendEmailSafe = curry((transport, mailOptions) =>
   new Promise((success, failure) =>
-    sendEmailFunction(mailOptions, (err, info) =>
+    transport.sendEmail(mailOptions, (err, info) =>
       err
       ? failure(err)
       : success(info)
@@ -78,10 +78,10 @@ const sendEmailSafe = curry((sendEmailFunction, mailOptions) =>
   )
 )
 
-const sendEmailOrNext = curry((readFile, config, createTransport, getUserEmail, req, res, next) =>
+const sendEmailOrNext = curry((readFile, config, createTransport, getUserEmail, render, req, res, next) =>
   validFilesOnRequest(req)
-    ? sendEmail(readFile, config, createTransport, getUserEmail, req, res, next)
-    : next() && Promise.resolve(false))
+    ? sendEmail(readFile, config, createTransport, getUserEmail, render, req, res, next)
+    : next() || Promise.resolve(false))
 
 const filterCleanFilesAndMapToAttachments = flow([
   get('files'),
@@ -104,6 +104,9 @@ const renderEmailAndGetEmailService = curry((config, render, template, userEmail
   ])
 )
 
+const nextAndResolve = curry((next, info) => next() || Promise.resolve(info))
+const nextAndError = curry((next, error) => next(error) || Promise.reject(error))
+
 const sendEmail = curry((readFile, config, createTransport, getUserEmail, render, req, res, next) =>
     getEmailTemplateAndAttachments(getUserEmail, readFile, req)
     .then( ([userEmailAddress, emailTemplate, fileAttachments]) => 
@@ -112,7 +115,7 @@ const sendEmail = curry((readFile, config, createTransport, getUserEmail, render
         sendEmailSafe(
           createTransport(
             createTransportObject(emailService.host, emailBody.port)
-          ).sendEmail,
+          ),
           createMailOptions(
             emailService.from,
             emailService.to,
@@ -122,7 +125,9 @@ const sendEmail = curry((readFile, config, createTransport, getUserEmail, render
           )
         )
       )
-    ))
+    )
+    .then(nextAndResolve(next))
+    .catch(nextAndError(next)))
 
 
 app.post('/upload', sendEmail(fs.readFile, config, nodemailer.createTransport, user.getUserEmail))
@@ -132,9 +137,10 @@ app.post('/upload', virusScan, sendEmail)
 
 const howFly = () => 'sooooo fly'
 const mainIsModule = (module, main) => main === module
+const logPort = port => console.log(`Example app listening on port ${port}!`) || true
 const startServerIfCommandline = (main, module, app, port) =>
   mainIsModule(main, module)
-  ? Just(app.listen(3000, () => console.log('Example app listening on port 3000!')))
+  ? Just(app.listen(3000, logPort))
   : Nothing()
 
 module.exports = {
@@ -156,7 +162,11 @@ module.exports = {
   filterCleanFilesAndMapToAttachments,
   getEmailTemplateAndAttachments,
   renderEmailAndGetEmailService,
-  sendEmail
+  sendEmail,
+  nextAndResolve,
+  nextAndError,
+  sendEmailOrNext,
+  logPort
 }
 
 startServerIfCommandline(require.main, module, app, 3000)

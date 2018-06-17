@@ -27,7 +27,11 @@ const {
     filterCleanFilesAndMapToAttachments,
     getEmailTemplateAndAttachments,
     renderEmailAndGetEmailService,
-    sendEmail
+    sendEmail,
+    nextAndResolve,
+    nextAndError,
+    sendEmailOrNext,
+    logPort
 } = require('../src/server')
 
 describe('src/server.js', ()=> {
@@ -186,13 +190,27 @@ describe('src/server.js', ()=> {
         })
     })
     describe('sendEmailSafe when called', ()=> {
-        const sendEmailStub = (options, callback) => callback(undefined, 'info')
-        const sendEmailBadStub = (options, callback) => callback(new Error('dat boom'))
+        class TransportStub {
+            constructor(mailOptions) {
+                this.mailOptions = mailOptions
+            }
+            sendEmail(options, callback) {
+                callback(undefined, 'info')
+            }
+        }
+        class TransportStubBad {
+            constructor(mailOptions) {
+                this.mailOptions = mailOptions
+            }
+            sendEmail(options, callback) {
+                callback(new Error('dat boom'))
+            }
+        }
         it('should work with good stubs', ()=> {
-            return expect(sendEmailSafe(sendEmailStub, {})).to.be.fulfilled
+            return expect(sendEmailSafe(new TransportStub({}), {})).to.be.fulfilled
         })
         it('should fail with bad stubs', ()=> {
-            return expect(sendEmailSafe(sendEmailBadStub, {})).to.be.rejected
+            return expect(sendEmailSafe(new TransportStubBad({}), {})).to.be.rejected
         })
     })
     describe('filterCleanFilesAndMapToAttachments when called', ()=> {
@@ -316,25 +334,85 @@ describe('src/server.js', ()=> {
             ).to.be.rejected
         })
     })
+    describe('nextAndResolve when called', ()=> {
+        it('should fulfill', () => {
+            return expect(nextAndResolve(noop, 'info')).to.be.fulfilled
+        })
+        it('should resolve', () => {
+            return expect(nextAndResolve(noop, 'info')).to.become('info')
+        })
+    })
+    describe('nextAndError when called', ()=> {
+        it('should reject', () => {
+            return expect(nextAndError(noop, new Error('they know what is what'))).to.be.rejected
+        })
+        it('should reject with error', () => {
+            const datBoom = new Error('they just strut')
+            return expect(nextAndError(noop, datBoom)).to.rejectedWith(datBoom)
+        })
+    })
+    describe('sendEmailOrNext when called', ()=> {
+        const readFileStub = (path, encoding, callback) => callback(undefined, 'email')
+        const readFileStubBad = (path, encoding, callback) => callback(new Error('read file fail'))
+        const configStub = { has: stubTrue, get: () => 'email service' }
+        const createTransportStub = () => ({
+            sendEmail: (options, callback) => callback(undefined, 'info')
+        })
+        const getUserEmailStub = () => 'email'
+        const renderStub = stubTrue
+        const reqStub = {
+            cookie: { sessionID: '1' },
+            files: [{scan: 'clean', originalname: 'so fresh', path: '/o/m/g'}]
+        }
+        const reqStubNoFiles = { cookie: { sessionID: '1' } }
+        const resStub = {}
+        const nextStub = noop
+        it('should work with good stubs', ()=> {
+            return expect(
+                sendEmailOrNext(
+                    readFileStub,
+                    configStub,
+                    createTransportStub,
+                    getUserEmailStub,
+                    renderStub,
+                    reqStub,
+                    resStub,
+                    nextStub
+                )
+            ).to.be.fulfilled
+        })
+        it('should fail with bad stubs', ()=> {
+            return expect(
+                sendEmailOrNext(
+                    readFileStubBad,
+                    configStub,
+                    createTransportStub,
+                    getUserEmailStub,
+                    renderStub,
+                    reqStub,
+                    resStub,
+                    nextStub
+                )
+            ).to.be.rejected
+        })
+        it('should resolve with false if no files', ()=> {
+            return expect(
+                sendEmailOrNext(
+                    readFileStub,
+                    configStub,
+                    createTransportStub,
+                    getUserEmailStub,
+                    renderStub,
+                    reqStubNoFiles,
+                    resStub,
+                    nextStub
+                )
+            ).to.become(false)
+        })
+    })
+    describe('logPort when called', ()=> {
+        it('should be true with a port of 222', ()=> {
+            expect(logPort(222)).to.equal(true)
+        })
+    })
 })
-
-
-// const sendEmail = curry((readFile, config, createTransport, getUserEmail, render, req, res, next) =>
-//     getEmailTemplateAndAttachments(getUserEmail, readFile, req)
-//     .then( ([userEmailAddress, emailTemplate, fileAttachments]) => 
-//       renderEmailAndGetEmailService(config, render, emailTemplate, userEmailAddress)
-//       .then( ([emailBody, emailService]) =>
-//         sendEmailSafe(
-//           createTransport(
-//             createTransportObject(emailService.host, emailBody.port)
-//           ).sendEmail,
-//           createMailOptions(
-//             emailService.from,
-//             emailService.to,
-//             emailService.subject,
-//             emailBody,
-//             fileAttachments
-//           )
-//         )
-//       )
-//     ))
