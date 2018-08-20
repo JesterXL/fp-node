@@ -89,7 +89,7 @@ const filterCleanFilesAndMapToAttachments = flow([
   mapFilesToAttachments
 ])
 
-const getSessionIDFromRequest = get('cookie.sessionID')
+const getSessionIDFromRequest = get('cookies.sessionID')
 const getEmailTemplateAndAttachments = curry((getUserEmail, readFile, req) =>
   Promise.all([
     getUserEmail(getSessionIDFromRequest(req)),

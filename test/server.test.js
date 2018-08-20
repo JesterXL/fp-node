@@ -231,7 +231,7 @@ describe('src/server.js', ()=> {
     })
     describe('getEmailTemplateAndAttachments when called', ()=> {
         const reqStub = {
-            cookie: { sessionID: '1' },
+            cookies: { sessionID: '1' },
             files: [{scan: 'clean', originalname: 'so fresh', path: '/o/m/g'}]
         }
         const getUserEmailStub = () => 'email'
@@ -285,7 +285,7 @@ describe('src/server.js', ()=> {
         const getUserEmailStub = () => 'email'
         const renderStub = stubTrue
         const reqStub = {
-            cookie: { sessionID: '1' },
+            cookies: { sessionID: '1' },
             files: [{scan: 'clean', originalname: 'so fresh', path: '/o/m/g'}]
         }
         const resStub = {}
@@ -361,10 +361,10 @@ describe('src/server.js', ()=> {
         const getUserEmailStub = () => 'email'
         const renderStub = stubTrue
         const reqStub = {
-            cookie: { sessionID: '1' },
+            cookies: { sessionID: '1' },
             files: [{scan: 'clean', originalname: 'so fresh', path: '/o/m/g'}]
         }
-        const reqStubNoFiles = { cookie: { sessionID: '1' } }
+        const reqStubNoFiles = { cookies: { sessionID: '1' } }
         const resStub = {}
         const nextStub = noop
         it('should work with good stubs', ()=> {
